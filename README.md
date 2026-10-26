@@ -59,6 +59,22 @@ The screenshot below shows the DVWA application running in the local laboratory.
 
 ![DVWA Dashboard](screenshots/dvwa-dashboard.png)
 
+## Documentation
+
+Detailed documentation for this project is available in the following files:
+
+- [Lab Setup Guide](notes/setup.md) — installation, configuration, and verification steps.
+- [Security Findings](notes/findings.md) — practical test observations and results.
+- [Source Code Analysis](notes/source-code-analysis.md) — analysis of the vulnerable SQL Injection implementation.
+- [SQL Injection Remediation Report](reports/sqli-remediation.md) — recommended fixes, secure coding practices, and verification plan.
+
+## Screenshots
+
+- [DVWA Dashboard](screenshots/dvwa-dashboard.png)
+- [DVWA Setup Check](screenshots/dvwa-setup-check.png)
+- [SQL Injection — Low Security Level](screenshots/sqli-low-test.png)
+- [SQL Injection — Medium Security Level](screenshots/sqli-medium-test.png)
+
 ## Learning Outcomes
 
 - Web application security fundamentals
