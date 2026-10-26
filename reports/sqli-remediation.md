@@ -106,3 +106,100 @@ Parameterized queries are the primary recommended defense against SQL Injection.
 ## 10. Scope
 
 This report documents educational testing performed against the local DVWA laboratory. No external systems were targeted.
+
+## Medium Security Level — Remediation Analysis
+
+### 1. Identified Issue
+
+The Medium security level applies `mysqli_real_escape_string()` to the submitted ID. However, the resulting value is concatenated directly into the SQL query:
+
+```php
+$id = mysqli_real_escape_string(
+    $GLOBALS["___mysqli_ston"],
+    $id
+);
+
+$query = "SELECT first_name, last_name FROM users WHERE user_id = $id;";
+```
+
+The ID is inserted without SQL string quotes. Escaping alone is not a sufficient defense for this numeric expression. The application should validate the expected input type and use a parameterized query.
+
+### 2. Recommended Fix
+
+Use server-side input validation and a MySQLi prepared statement. The following is an illustrative example for the MySQL branch, not a drop-in replacement for the original DVWA file.
+
+```php
+$id = filter_var(
+    $_POST['id'] ?? null,
+    FILTER_VALIDATE_INT
+);
+
+if ($id === false || $id === null || $id < 1) {
+    http_response_code(400);
+    exit('Invalid input');
+}
+
+$stmt = $GLOBALS["___mysqli_ston"]->prepare(
+    "SELECT first_name, last_name
+     FROM users
+     WHERE user_id = ?"
+);
+
+$stmt->bind_param("i", $id);
+$stmt->execute();
+
+$result = $stmt->get_result();
+
+while ($row = $result->fetch_assoc()) {
+    $first = htmlspecialchars(
+        $row['first_name'],
+        ENT_QUOTES,
+        'UTF-8'
+    );
+
+    $last = htmlspecialchars(
+        $row['last_name'],
+        ENT_QUOTES,
+        'UTF-8'
+    );
+
+    echo "<pre>First name: {$first}\nSurname: {$last}</pre>";
+}
+
+$stmt->close();
+```
+
+**Why this helps:**
+
+- Input validation rejects missing, invalid, or non-positive IDs.
+- Prepared statements keep the parameter separate from the SQL query structure.
+- `htmlspecialchars()` encodes returned values for HTML text output.
+- Generic user-facing errors reduce unnecessary disclosure of database details.
+
+The SQLite branch must use its own parameter-binding API if that database backend is enabled. The `get_result()` method in this MySQLi example requires PHP's `mysqlnd` driver.
+
+### 3. Additional Security Controls
+
+- Do not expose raw database errors to users; log diagnostic details securely on the server.
+- Use a database account with only the permissions the application requires.
+- Keep database credentials out of GitHub and never commit `config.inc.php`.
+- Validate input on the server even when the interface uses a dropdown.
+- Preserve the original vulnerable DVWA code for controlled educational testing; keep secure examples in documentation or a separate demonstration file.
+
+### 4. Verification Plan
+
+After implementing the fix in a separate test application or authorized test copy:
+
+1. Submit a valid existing positive integer ID and confirm the expected record is returned.
+2. Submit a nonexistent positive integer ID and confirm that no unrelated records are returned.
+3. Submit empty, malformed, negative, and non-integer values and confirm that they are rejected.
+4. Run authorized SQL Injection test cases in the isolated lab and verify that input cannot alter the query's intended structure.
+5. Check that HTML output is encoded and that detailed database errors are not exposed to users.
+
+### 5. Current Status
+
+The Medium source code has been reviewed and the recommended mitigations have been documented. The remediation example has not been applied to the original DVWA source, and the fix has not yet been independently verified. Testing results should be recorded only after the checks above have actually been performed.
+
+### 6. Conclusion
+
+The Medium implementation adds escaping, but still constructs its SQL query by concatenating user-controlled input. Server-side validation and prepared statements are the primary recommended controls. Output encoding, safe error handling, and least-privilege database access provide additional layers of protection.
