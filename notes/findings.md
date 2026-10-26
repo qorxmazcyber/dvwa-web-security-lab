@@ -81,3 +81,29 @@ DVWA is intentionally vulnerable and should not be exposed to the public interne
 - Study how parameterized queries prevent SQL Injection.
 - Document additional vulnerabilities, their impact, and mitigation techniques.
 - Capture screenshots to support test findings.
+
+## 3. SQL Injection — Medium Security Level
+
+### Objective
+Observe how DVWA handles user input at the Medium security level.
+
+### Test Environment
+- Application: DVWA
+- Security Level: Medium
+- Module: SQL Injection
+- Target: Local DVWA instance (`127.0.0.1`)
+
+### Test
+Selected User ID `1` from the dropdown list and submitted the request.
+
+### Actual Result
+The application returned the user information associated with the selected ID.
+
+### Observation
+The User ID field is presented as a dropdown containing numeric options. The normal request completed successfully.
+
+### Security Consideration
+A dropdown restricts the values selected through the normal browser interface, but this alone does not prove that the server-side code is secure against SQL Injection.
+
+### Status
+Normal input test completed. Further security analysis is pending.
