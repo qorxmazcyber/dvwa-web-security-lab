@@ -132,3 +132,132 @@ The Low security level demonstrates how directly embedding untrusted input in an
 ## 8. Scope
 
 All testing was performed against the local DVWA laboratory. The findings are for educational purposes and do not represent an assessment of any external application.
+
+## Medium Security Level — Source Code Analysis
+
+### 1. Overview
+
+The Medium security level introduces additional input handling compared with the Low security level. The application reads the submitted ID from the POST request and applies `mysqli_real_escape_string()` before constructing the SQL query.
+
+However, escaping input does not automatically make a dynamically constructed SQL query safe. The effectiveness of escaping depends on the context in which the value is used.
+
+### 2. Input Handling
+
+The application checks whether the Submit parameter exists and then retrieves the submitted ID:
+
+```php
+if (isset($_POST['Submit'])) {
+    $id = $_POST['id'];
+}
+```
+
+**Observation:** The value comes from user-controlled input. A dropdown in the browser is not a security boundary because a client can modify an HTTP request.
+
+**Recommendation:** Validate input on the server. If the ID must be a positive integer, reject values that do not meet that requirement.
+
+### 3. Input Escaping
+
+The code applies:
+
+```php
+$id = mysqli_real_escape_string(
+    $GLOBALS["___mysqli_ston"],
+    $id
+);
+```
+
+This function escapes certain special characters according to the database connection's character set and SQL rules. It is commonly used when values are inserted into SQL string literals.
+
+In this implementation, however, the ID is inserted into the query without surrounding quotes:
+
+```php
+$query = "SELECT first_name, last_name FROM users WHERE user_id = $id;";
+```
+
+This means escaping alone is not an adequate security control for the numeric SQL expression. The application should validate the expected data type and use a parameterized query.
+
+### 4. SQL Query Analysis
+
+The query retrieves the first and last names of a record whose `user_id` matches the supplied value.
+
+The main concern is that user input is concatenated directly into SQL syntax rather than being passed as a separate parameter.
+
+**Potential impact:** If an attacker can influence the SQL expression, the query may return unintended records or behave differently from what the application intended. The actual impact must be assessed through authorized testing in the local DVWA lab.
+
+### 5. Error Handling
+
+The MySQL branch includes database error details in the response. The SQLite branch also displays exception or database error information.
+
+Detailed database errors can disclose implementation details. Production applications should log diagnostic information securely on the server and return a generic error message to the user.
+
+### 6. Output Encoding
+
+Database values are inserted into HTML output. SQL Injection and Cross-Site Scripting (XSS) are different vulnerabilities, but output encoding is still important.
+
+When displaying untrusted text in HTML, use context-appropriate encoding, such as PHP's `htmlspecialchars()` for HTML text.
+
+### 7. Recommended Mitigations
+
+- Validate the submitted ID on the server as a positive integer.
+- Use prepared statements with bound parameters instead of concatenating input into SQL.
+- Avoid displaying raw database errors to end users.
+- Encode untrusted values before rendering them in HTML.
+- Apply least-privilege permissions to the application's database account.
+- Test the fix with valid input, invalid input, and controlled security test cases.
+
+### 8. Illustrative Secure MySQL Example
+
+The following example demonstrates the recommended approach. It is an educational example, not a drop-in replacement for DVWA's original source file.
+
+```php
+$id = filter_var(
+    $_POST['id'] ?? null,
+    FILTER_VALIDATE_INT
+);
+
+if ($id === false || $id === null || $id < 1) {
+    http_response_code(400);
+    exit('Invalid input');
+}
+
+$stmt = $GLOBALS["___mysqli_ston"]->prepare(
+    "SELECT first_name, last_name
+     FROM users
+     WHERE user_id = ?"
+);
+
+$stmt->bind_param("i", $id);
+$stmt->execute();
+
+$result = $stmt->get_result();
+
+while ($row = $result->fetch_assoc()) {
+    $first = htmlspecialchars(
+        $row['first_name'],
+        ENT_QUOTES,
+        'UTF-8'
+    );
+
+    $last = htmlspecialchars(
+        $row['last_name'],
+        ENT_QUOTES,
+        'UTF-8'
+    );
+
+    echo "<pre>First name: {$first}\nSurname: {$last}</pre>";
+}
+
+$stmt->close();
+```
+
+This example is specifically for the MySQLi branch. The SQLite branch requires a separate implementation using SQLite's parameter-binding API. The `get_result()` method also requires PHP's `mysqlnd` driver.
+
+### 9. Testing Status
+
+The source code has been reviewed. The code structure indicates that escaping is used, but the ID is still concatenated into the SQL query without quotes.
+
+A practical Medium-level test result should only be documented after the behavior has been verified in the local DVWA lab. No successful bypass or complete remediation is claimed by this source review alone.
+
+### 10. Conclusion
+
+The Medium security level adds input escaping compared with the Low implementation, but the query still relies on dynamically concatenated input. Server-side validation and prepared statements are the recommended primary controls. The original DVWA source remains unchanged for controlled educational testing.
